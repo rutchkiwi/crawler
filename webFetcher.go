@@ -10,15 +10,17 @@ import (
 type WebFetcher struct{}
 
 func (f WebFetcher) Fetch(url string) (string, []string, error) {
-	resp, _ := http.Get(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", nil, fmt.Errorf("not found: %s", url)
+	}
+
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 
 	bodyStr := string(bodyBytes[:])
 
-	fmt.Println(bodyStr)
-
-	return "", nil, fmt.Errorf("not implemented")
+	return bodyStr, findUrls(bodyStr), nil
 }
 
 func findUrls(html string) []string {
@@ -29,7 +31,6 @@ func findUrls(html string) []string {
 	for i, match := range matches {
 		res[i] = match[1]
 	}
-	fmt.Println(res)
 
 	return res
 }

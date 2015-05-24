@@ -34,8 +34,6 @@ func crawlHelper(url string, depth int, fetcher Fetcher, ch chan string, visitAc
 	visited[url] = true
 	visitAccess <- visited
 
-	fmt.Println("now visiting url", url)
-
 	ch <- url
 
 	_, urls, err := fetcher.Fetch(url)
@@ -69,13 +67,15 @@ func Crawl(url string, depth int, fetcher Fetcher) {
 
 	go crawlHelper(url, depth, fetcher, results, visitAccess, wg)
 
+	count := 0
 	for url := range results {
-		fmt.Printf("Crawled url: %s\n", url)
+		count++
+		fmt.Printf("Crawled url #%d: %s\n", count, url)
 	}
 }
 
 func main() {
-	Crawl("http://golang.org/", 4, WebFetcher{})
+	Crawl("http://golang.org/", 5, WebFetcher{})
 }
 
 // fetcher is a populated fakeFetcher.
