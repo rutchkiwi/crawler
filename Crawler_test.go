@@ -9,13 +9,13 @@ import (
 
 func TestCrawling(t *testing.T) {
 	urls, _ := Crawl("http://golang.org/", 7, fakeFetcher)
-	assert.Equal(t, 5, len(urls), fmt.Sprintf("all urls should be visited. Visited %s", urls))
+	assert.Equal(t, 4, len(urls), fmt.Sprintf("all urls should be visited. Visited %s", urls))
 }
 
 func TestCrawlingErrors(t *testing.T) {
 	_, errors := Crawl("http://golang.org/", 7, fakeFetcher)
 
-	assert.Equal(t, 1, len(errors), fmt.Sprintf("all errors should be returned"))
+	assert.Equal(t, 2, len(errors), fmt.Sprintf("all errors should be returned"))
 }
 
 // fetcher is a populated fakeFetcher.
@@ -48,6 +48,7 @@ var fakeFetcher = FakeFetcher{
 		[]string{
 			"http://golang.org/",
 			"http://golang.org/pkg/",
+			"http://banana",
 		},
 	},
 }
