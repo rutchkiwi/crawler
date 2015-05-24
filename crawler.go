@@ -75,26 +75,11 @@ func Crawl(url string, depth int, fetcher Fetcher) {
 }
 
 func main() {
-	Crawl("http://golang.org/", 4, fetcher)
-}
-
-// fakeFetcher is Fetcher that returns canned results.
-type fakeFetcher map[string]*fakeResult
-
-type fakeResult struct {
-	body string
-	urls []string
-}
-
-func (f fakeFetcher) Fetch(url string) (string, []string, error) {
-	if res, ok := f[url]; ok {
-		return res.body, res.urls, nil
-	}
-	return "", nil, fmt.Errorf("not found: %s", url)
+	Crawl("http://golang.org/", 4, fakeFetcher)
 }
 
 // fetcher is a populated fakeFetcher.
-var fetcher = fakeFetcher{
+var fakeFetcher = FakeFetcher{
 	"http://golang.org/": &fakeResult{
 		"The Go Programming Language",
 		[]string{
