@@ -16,40 +16,48 @@ type Fetcher interface {
 	Fetch(url string) (body string, urls []string, err error)
 }
 
+type crawlerShared struct {
+	fetcher     Fetcher
+	results     chan string
+	visitAccess chan map[string]bool
+	wg          *sync.WaitGroup
+	errors      chan error
+}
+
 // crawlHelper uses fetcher to recursively crawlHelper
 // pages starting with url, to a maximum of depth.
-func crawlHelper(url string, depth int, fetcher Fetcher, ch chan string, visitAccess chan map[string]bool, wg *sync.WaitGroup) {
-	defer wg.Done()
+func crawlHelper(url string, depth int, shared *crawlerShared) {
+	defer shared.wg.Done()
 
 	if depth <= 0 {
 		return
 	}
 
-	visited := <-visitAccess
+	visited := <-shared.visitAccess
 	if visited[url] {
 		fmt.Println("already visited", url)
-		visitAccess <- visited
+		shared.visitAccess <- visited
 		return
 	}
 	visited[url] = true
-	visitAccess <- visited
+	shared.visitAccess <- visited
 
-	ch <- url
+	shared.results <- url
 
-	_, urls, err := fetcher.Fetch(url)
+	_, urls, err := shared.fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	for _, u := range urls {
-		wg.Add(1)
-		go crawlHelper(u, depth-1, fetcher, ch, visitAccess, wg)
+		shared.wg.Add(1)
+		go crawlHelper(u, depth-1, shared)
 	}
 	return
 }
 
-func Crawl(url string, depth int, fetcher Fetcher) {
+func Crawl(url string, depth int, fetcher Fetcher) ([]string, []error) {
 	var results chan string = make(chan string, 10)
 
 	// channel to serialize access to the list of visited sites
@@ -65,49 +73,21 @@ func Crawl(url string, depth int, fetcher Fetcher) {
 		close(results)
 	}(results, wg)
 
-	go crawlHelper(url, depth, fetcher, results, visitAccess, wg)
+	errors := make(chan error)
+	shared := &crawlerShared{fetcher, results, visitAccess, wg, errors}
 
+	go crawlHelper(url, depth, shared)
+
+	ret := make([]string, 0)
 	count := 0
 	for url := range results {
 		count++
 		fmt.Printf("Crawled url #%d: %s\n", count, url)
+		ret = append(ret, url)
 	}
+	return ret, nil
 }
 
 func main() {
-	Crawl("http://golang.org/", 5, WebFetcher{})
-}
-
-// fetcher is a populated fakeFetcher.
-var fakeFetcher = FakeFetcher{
-	"http://golang.org/": &fakeResult{
-		"The Go Programming Language",
-		[]string{
-			"http://golang.org/pkg/",
-			"http://golang.org/cmd/",
-		},
-	},
-	"http://golang.org/pkg/": &fakeResult{
-		"Packages",
-		[]string{
-			"http://golang.org/",
-			"http://golang.org/cmd/",
-			"http://golang.org/pkg/fmt/",
-			"http://golang.org/pkg/os/",
-		},
-	},
-	"http://golang.org/pkg/fmt/": &fakeResult{
-		"Package fmt",
-		[]string{
-			"http://golang.org/",
-			"http://golang.org/pkg/",
-		},
-	},
-	"http://golang.org/pkg/os/": &fakeResult{
-		"Package os",
-		[]string{
-			"http://golang.org/",
-			"http://golang.org/pkg/",
-		},
-	},
+	Crawl("http://golang.org/", 6, WebFetcher{})
 }
