@@ -58,7 +58,7 @@ func crawlHelper(url string, depth int, shared *crawlerShared) {
 }
 
 func Crawl(url string, depth int, fetcher Fetcher) ([]string, []error) {
-	results := make(chan string, 10)
+	results := make(chan string, 100000)
 	errors := make(chan error, 1000000)
 
 	// channel to serialize access to the list of visited sites
@@ -96,7 +96,9 @@ func Crawl(url string, depth int, fetcher Fetcher) ([]string, []error) {
 	count := 0
 	for url := range results {
 		count++
-		//fmt.Printf("Crawled url #%d: %s\n", count, url)
+		if count%1 == 0 {
+			fmt.Printf("Crawled url #%d: %s\n", count, url)
+		}
 		ret = append(ret, url)
 	}
 
@@ -105,5 +107,7 @@ func Crawl(url string, depth int, fetcher Fetcher) ([]string, []error) {
 }
 
 func main() {
-	Crawl("http://golang.org/", 6, WebFetcher{})
+	urls, errors := Crawl("http://golang.org/", 6, WebFetcher{})
+
+	fmt.Printf("crawled: %d. Failed: %d\n", len(urls), len(errors))
 }

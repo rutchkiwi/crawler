@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"regexp"
@@ -12,7 +11,7 @@ type WebFetcher struct{}
 func (f WebFetcher) Fetch(url string) (string, []string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", nil, fmt.Errorf("not found: %s", url)
+		return "", nil, err
 	}
 
 	defer resp.Body.Close()
