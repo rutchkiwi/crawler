@@ -22,7 +22,7 @@ func (f WebFetcher) Fetch(url string) (string, []string, error) {
 }
 
 func findUrls(html string) []string {
-	r, _ := regexp.Compile(`"(http://.*?)">`)
+	r, _ := regexp.Compile(`href="(http://.*?)"`)
 	matches := r.FindAllStringSubmatch(html, -1)
 
 	res := make([]string, len(matches))
@@ -32,10 +32,4 @@ func findUrls(html string) []string {
 	fmt.Println(res)
 
 	return res
-}
-
-func main() {
-	body := `Go offers built-in support for <a href="http://en.wikipedia.org/wiki/Regular_expression">regular expressions</a>.
-Here are some examples of  common regexp-related tasks`
-	fmt.Printf("found: %s\n", findUrls(body))
 }
