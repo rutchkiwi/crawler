@@ -75,7 +75,7 @@ func Crawl(url string, depth int, fetcher Fetcher) {
 }
 
 func main() {
-	Crawl("http://golang.org/", 4, fakeFetcher)
+	Crawl("http://golang.org/", 4, WebFetcher{})
 }
 
 // fetcher is a populated fakeFetcher.
