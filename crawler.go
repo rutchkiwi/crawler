@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"sync"
-	"time"
 )
 
 type visitedUrls struct {
@@ -21,14 +20,11 @@ type Fetcher interface {
 // pages starting with url, to a maximum of depth.
 func crawlHelper(url string, depth int, fetcher Fetcher, ch chan string, visitAccess chan map[string]bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	time.Sleep(300 * time.Millisecond)
 
-	// TODO: Fetch URLs in parallel.
-	// TODO: Don't fetch the same URL twice.
-	// This implementation doesn't do either:
 	if depth <= 0 {
 		return
 	}
+
 	visited := <-visitAccess
 	if visited[url] {
 		fmt.Println("already visited", url)
@@ -40,14 +36,14 @@ func crawlHelper(url string, depth int, fetcher Fetcher, ch chan string, visitAc
 
 	fmt.Println("now visiting url", url)
 
+	ch <- url
+
 	_, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	//fmt.Printf("found: %s %q\n", url, body)
-	ch <- url
 	for _, u := range urls {
 		wg.Add(1)
 		go crawlHelper(u, depth-1, fetcher, ch, visitAccess, wg)
@@ -56,20 +52,24 @@ func crawlHelper(url string, depth int, fetcher Fetcher, ch chan string, visitAc
 }
 
 func Crawl(url string, depth int, fetcher Fetcher) {
-	var ch chan string = make(chan string, 10)
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	var results chan string = make(chan string, 10)
 
+	// channel to serialize access to the list of visited sites
 	visitAccess := make(chan map[string]bool, 1)
 	visitAccess <- make(map[string]bool)
 
-	go crawlHelper(url, depth, fetcher, ch, visitAccess, wg)
-	go func(ch chan string, wg *sync.WaitGroup) {
+	// wait group used to shut down the result channel when
+	// all goroutines are completed.
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func(results chan string, wg *sync.WaitGroup) {
 		wg.Wait()
-		close(ch)
-	}(ch, wg)
+		close(results)
+	}(results, wg)
 
-	for url := range ch {
+	go crawlHelper(url, depth, fetcher, results, visitAccess, wg)
+
+	for url := range results {
 		fmt.Printf("Crawled url: %s\n", url)
 	}
 }
