@@ -5,11 +5,6 @@ import (
 	"sync"
 )
 
-type visitedUrls struct {
-	sync.RWMutex
-	m map[string]bool
-}
-
 type Fetcher interface {
 	// Fetch returns the body of URL and
 	// a slice of URLs found on that page.
@@ -20,25 +15,20 @@ type crawlerShared struct {
 	fetcher     Fetcher
 	results     chan string
 	visitAccess chan map[string]bool
-	wg          *sync.WaitGroup
 	errors      chan error
+	queue       chan string
+	wg          *sync.WaitGroup //remove
+	statusChan  chan int
 }
 
-// crawlHelper uses fetcher to recursively crawlHelper
-// pages starting with url, to a maximum of depth.
-func crawlHelper(url string, depth int, shared *crawlerShared) {
-	defer shared.wg.Done()
-
-	if depth <= 0 {
-		return
-	}
-
+func handleOneUrl(url string, shared *crawlerShared) {
 	visited := <-shared.visitAccess
 	if visited[url] {
 		//fmt.Println("already visited", url)
 		shared.visitAccess <- visited
 		return
 	}
+	fmt.Println("now working on " + string(url))
 	visited[url] = true
 	shared.visitAccess <- visited
 
@@ -50,36 +40,60 @@ func crawlHelper(url string, depth int, shared *crawlerShared) {
 	// Doesn't count as a result unless we could visit the site
 	shared.results <- url
 
-	for _, u := range urls {
-		shared.wg.Add(1)
-		go crawlHelper(u, depth-1, shared)
+	for _, url := range urls {
+		shared.queue <- url
 	}
 	return
+}
+
+// crawlHelper uses fetcher to recursively crawlHelper
+// pages starting with url, to a maximum of depth.
+func crawlHelper(shared *crawlerShared) {
+	for {
+		shared.statusChan <- -1
+		select {
+		case url := <-shared.queue:
+			shared.statusChan <- 1
+			handleOneUrl(url, shared)
+		default:
+			fmt.Println("default happend")
+			return
+		}
+	}
 }
 
 func Crawl(url string, depth int, fetcher Fetcher) ([]string, []error) {
 	results := make(chan string, 100000)
 	errors := make(chan error, 1000000)
+	queue := make(chan string, 1000000)
+	statusChannel := make(chan string, 1000000)
 
 	// channel to serialize access to the list of visited sites
 	visitAccess := make(chan map[string]bool, 1)
 	visitAccess <- make(map[string]bool)
 
-	// wait group used to shut down the result channel when
-	// all goroutines are completed.
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func(results chan string, wg *sync.WaitGroup) {
-		wg.Wait()
-		close(results)
-		close(errors)
-	}(results, wg)
-
-	shared := &crawlerShared{fetcher, results, visitAccess, wg, errors}
-
 	errorListChannel := make(chan []error, 2)
 
-	go crawlHelper(url, depth, shared)
+	numberOfWorkers := 2
+
+	wg := &sync.WaitGroup{} //unnessecary
+
+	// wg.Add(numberOfWorkers)
+	// go func(results chan string, wg *sync.WaitGroup) {
+	// 	wg.Wait()
+	// 	close(results)
+	// 	close(errors)
+	// }(results, wg)
+
+	shared := &crawlerShared{fetcher, results, visitAccess, errors, queue, wg, statusChannel}
+	for i := 0; i < numberOfWorkers; i++ {
+		go crawlHelper(shared)
+	}
+
+	shared.queue <- url
+
+	// act on the results that should appear in the error and result channels.
+
 	go func(errors chan error) {
 		ret := make([]error, 0)
 		errorCount := 0
