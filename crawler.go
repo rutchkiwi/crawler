@@ -3,23 +3,24 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 )
 
 type queue struct{}
 
-func crawl(seedUrl string, fetcher Fetcher) chan siteInfo {
+func crawl(seedUrl string, fetcher Fetcher) chan SiteInfo {
 	nonVisited := make(chan string, 100)    // todo should be lower
 	resultsChan := make(chan []string, 100) // todo should be lower
 
-	outputAssets := make(chan siteInfo, 100) // todo should be lower
+	outputAssets := make(chan SiteInfo, 100) // todo should be lower
 
 	go dispatcher(nonVisited, resultsChan, outputAssets, seedUrl)
 	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
 	return outputAssets
 }
 
-func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets chan<- siteInfo, seedUrl string) {
+func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets chan<- SiteInfo, seedUrl string) {
 	// because we added a url before
 	seen := make(map[string]bool)
 	var wg sync.WaitGroup
@@ -43,6 +44,8 @@ func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets 
 				seen[url] = true
 				wg.Add(1)
 				nonVisited <- url
+			} else {
+				fmt.Printf("ignored url %s\n", url)
 			}
 		}
 		wg.Done()
@@ -50,12 +53,16 @@ func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets 
 
 }
 
-type siteInfo struct {
+type SiteInfo struct {
 	url    string
 	assets []string
 }
 
-func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- []string, outputAssets chan<- siteInfo) {
+func (info SiteInfo) String() string {
+	return fmt.Sprintf("%s has assets: %s", info.url, strings.Join(info.assets, ", "))
+}
+
+func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- []string, outputAssets chan<- SiteInfo) {
 	for url := range nonVisited {
 		// todo do assets and url search async ?
 
@@ -63,9 +70,9 @@ func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- [
 
 		body, _ := fetcher.Fetch(url) //handle error!
 
-		fmt.Printf("body: %v", body)
 		assets := findAssets(body)
-		info := siteInfo{url, assets}
+		info := SiteInfo{url, assets}
+
 		// bad name outputAssets
 		outputAssets <- info
 
@@ -74,8 +81,10 @@ func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- [
 	}
 }
 
+//todo DONT PARSE WITH REGEX
+
 func findAssets(html string) []string {
-	r, _ := regexp.Compile(`src="()"`)
+	r, _ := regexp.Compile(`src="(.*?)"`)
 	matches := r.FindAllStringSubmatch(html, -1)
 
 	res := make([]string, len(matches))
