@@ -8,7 +8,7 @@ import (
 
 func TestCrawlsRightUrls(t *testing.T) {
 	var results chan SiteInfo
-	results = crawl("http://gocardless.com/a", fakeFetcher)
+	results = crawl("http://gocardless.com/a", fakeFetcher1)
 
 	r1 := <-results
 	assert.Equal(t, "http://gocardless.com/a", r1.url)
@@ -20,7 +20,7 @@ func TestCrawlsRightUrls(t *testing.T) {
 
 func TestFindImageAssets(t *testing.T) {
 	var results chan SiteInfo
-	results = crawl("http://gocardless.com/a", fakeFetcher)
+	results = crawl("http://gocardless.com/a", fakeFetcher1)
 
 	r1 := <-results
 	assert.Equal(t, "http://gocardless.com/a", r1.url)
@@ -38,8 +38,43 @@ func TestFindImageAssets(t *testing.T) {
 	assert.False(t, more)
 }
 
-// fetcher is a populated fakeFetcher.
-var fakeFetcher = FakeFetcher{
+func TestDontGoOutsideOriginalDomain(t *testing.T) {
+	var results chan SiteInfo
+	results = crawl("http://gocardless.com/a", fakeFetcher2)
+
+	r1 := <-results
+	assert.Equal(t, "http://gocardless.com/a", r1.url)
+	assert.Len(t, r1.assets, 1)
+	if len(r1.assets) == 1 {
+		assert.Equal(t, "picA.png", r1.assets[0])
+	}
+	_, more := <-results
+	assert.False(t, more)
+}
+
+func TestRelativeUrls(t *testing.T) {
+	var results chan SiteInfo
+	results = crawl("http://gocardless.com/a", fakeFetcherWithRelativeUrl)
+
+	r1 := <-results
+	assert.Equal(t, "http://gocardless.com/a", r1.url)
+	r2, _ := <-results
+	assert.Equal(t, "http://gocardless.com/b", r2.url)
+	_, more := <-results
+	assert.False(t, more)
+}
+
+var fakeFetcher1 = FakeFetcher{
 	"http://gocardless.com/a":  `<a href="https://gocardless.com/b"><img src="picA.png"/></a>`,
 	"https://gocardless.com/b": `<a href="http://gocardless.com/a"></a><img src="picB.png"/><a href="https://gocardless.com/b">link text</a>`,
+}
+
+var fakeFetcher2 = FakeFetcher{
+	"http://gocardless.com/a": `<a href="https://google.com"><img src="picA.png"/></a>`,
+	"https://google.com":      `welcome to google <img src="google.png"/>`,
+}
+
+var fakeFetcherWithRelativeUrl = FakeFetcher{
+	"http://gocardless.com/a": `<a href="/b"><img src="picA.png"/></a>`,
+	"http://gocardless.com/b": `<a href="http://gocardless.com/a"></a><img src="picB.png"/><a href="http://gocardless.com/b">link text</a>`,
 }

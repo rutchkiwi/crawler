@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -26,8 +28,15 @@ func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	seen[seedUrl] = true
-	nonVisited <- seedUrl
+
+	rootUrl, err := url.Parse(seedUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	seen[rootUrl.String()] = true
+	nonVisited <- rootUrl.String()
+	//log.Println("Will only allow urls on domain " + allowedDomain)
 
 	// close channels when job counter reaches zero
 	go func() {
@@ -38,12 +47,21 @@ func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets 
 	}()
 
 	for res := range resultsChan {
-		for _, url := range res {
-			if !seen[url] {
-				//				fmt.Printf("new url %s found \n", url)
-				seen[url] = true
+		for _, newUrl := range res {
+			parsedUrl, err := url.Parse(newUrl)
+			if err != nil {
+				log.Printf("could not parse url %s", newUrl)
+				continue
+			}
+			if !parsedUrl.IsAbs() {
+				parsedUrl.Host = rootUrl.Host
+				parsedUrl.Scheme = rootUrl.Scheme
+			}
+			if (!seen[parsedUrl.String()]) && (parsedUrl.Host == rootUrl.Host) {
+				//fmt.Printf("new url %s found \n", parsedUrl.String())
+				seen[parsedUrl.String()] = true
 				wg.Add(1)
-				nonVisited <- url
+				nonVisited <- parsedUrl.String()
 			}
 		}
 		wg.Done()
