@@ -3,31 +3,63 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"sync"
 )
 
 type queue struct{}
 
 func crawl(seedUrl string, fetcher Fetcher) chan string {
-	nonVisitedChan := make(chan string, 2)
-	resultsChan := make(chan string, 2)
+	nonVisited := make(chan string, 100)    // todo should be lower
+	resultsChan := make(chan []string, 100) // todo should be lower
 
-	nonVisitedChan <- seedUrl
-	go processUrls(nonVisitedChan, fetcher)
-	return resultsChan
+	outputUrls := make(chan string, 100) // todo should be lower
+
+	go dispatcher(nonVisited, resultsChan, outputUrls, seedUrl)
+	go processUrls(nonVisited, fetcher, resultsChan)
+	return outputUrls
 }
 
-func processUrls(nonVisitedChan <-chan string, fetcher Fetcher) {
-	for url := range nonVisitedChan {
-		fmt.Println(url)
-		fmt.Println("111")
+func dispatcher(nonVisited chan string, resultsChan chan []string, output chan<- string, seedUrl string) {
+	// because we added a url before
+	seen := make(map[string]bool)
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	seen[seedUrl] = true
+	nonVisited <- seedUrl
+
+	// close channels when job counter reaches zero
+	go func() {
+		wg.Wait()
+		close(nonVisited)
+		close(resultsChan)
+		close(output)
+	}()
+
+	for res := range resultsChan {
+		for _, url := range res {
+			if !seen[url] {
+				fmt.Printf("new url %s found \n", url)
+				seen[url] = true
+				wg.Add(1)
+				nonVisited <- url
+				output <- url
+			}
+		}
+		wg.Done()
+	}
+
+}
+
+func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- []string) {
+	for url := range nonVisited {
+		fmt.Printf("processing url %s \n", url)
 
 		body, _ := fetcher.Fetch(url) //handle error!
 
 		// fmt.Printf("body: %v", body)
 		urls := findUrls(body)
-		for _, url := range urls {
-			fmt.Println(url)
-		}
+		resultsChan <- urls
 	}
 }
 

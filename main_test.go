@@ -10,14 +10,11 @@ func TestCrawling(t *testing.T) {
 	var results chan string
 	results = crawl("http://a.com/", fakeFetcher)
 	r1 := <-results
-	assert.Equal(t, "http://a.com/", r1)
-	r2 := <-results
-	assert.Equal(t, "http://b.com/", r2)
-
+	assert.Equal(t, "http://b.com/", r1)
 }
 
 // fetcher is a populated fakeFetcher.
 var fakeFetcher = FakeFetcher{
-	"http://a.com/": `<a href="http://b.com/">link text</a>`,
-	"http://b.com/": `end`,
+	"http://a.com/": `<a href="http://b.com/"></a>`,
+	"http://b.com/": `<a href="http://a.com/"></a> bla bla bla <a href="http://b.com/">link text</a>`,
 }
