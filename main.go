@@ -3,15 +3,14 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 )
 
 func main() {
 	var results chan SiteInfo
-	results = crawl("http://a.com", fakeFetcher)
+	results = crawl("https://gocardless.com/", WebFetcher{})
 
-	for e := range results {
-		fmt.Println(e)
-	}
+	print_results(results, os.Stdout)
 }
 
 func print_results(results chan SiteInfo, out io.Writer) {

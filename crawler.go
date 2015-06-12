@@ -40,12 +40,10 @@ func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets 
 	for res := range resultsChan {
 		for _, url := range res {
 			if !seen[url] {
-				fmt.Printf("new url %s found \n", url)
+				//				fmt.Printf("new url %s found \n", url)
 				seen[url] = true
 				wg.Add(1)
 				nonVisited <- url
-			} else {
-				fmt.Printf("ignored url %s\n", url)
 			}
 		}
 		wg.Done()
@@ -66,7 +64,7 @@ func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- [
 	for url := range nonVisited {
 		// todo do assets and url search async ?
 
-		fmt.Printf("processing url %s \n", url)
+		//fmt.Printf("processing url %s \n", url)
 
 		body, _ := fetcher.Fetch(url) //handle error!
 
@@ -96,7 +94,7 @@ func findAssets(html string) []string {
 }
 
 func findUrls(html string) []string {
-	r, _ := regexp.Compile(`href="(http://.*?)"`)
+	r, _ := regexp.Compile(`href="(.*?)"`)
 	matches := r.FindAllStringSubmatch(html, -1)
 
 	res := make([]string, len(matches))
