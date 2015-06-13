@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,6 +65,24 @@ func TestRelativeUrls(t *testing.T) {
 	assert.False(t, more)
 }
 
+func TestManyLinks(t *testing.T) {
+	// attempt to shake out concurrency issues
+	var results chan SiteInfo
+	results = crawl("http://test.com/a", manyLinksFetcher)
+
+	r1 := <-results
+	assert.Equal(t, "http://test.com/a", r1.url)
+	r2, _ := <-results
+	assert.Equal(t, "http://test.com/b", r2.url)
+	r3, _ := <-results
+	assert.Equal(t, "http://test.com/c", r3.url)
+	r4, _ := <-results
+	assert.Equal(t, "http://test.com/d", r4.url)
+	r5, more := <-results
+	fmt.Println(r5)
+	assert.False(t, more)
+}
+
 var fakeFetcher1 = FakeFetcher{
 	"http://gocardless.com/a":  `<a href="https://gocardless.com/b"><img src="picA.png"/></a>`,
 	"https://gocardless.com/b": `<a href="http://gocardless.com/a"></a><img src="picB.png"/><a href="https://gocardless.com/b">link text</a>`,
@@ -77,4 +96,13 @@ var fakeFetcher2 = FakeFetcher{
 var fakeFetcherWithRelativeUrl = FakeFetcher{
 	"http://gocardless.com/a": `<a href="/b"><img src="picA.png"/></a>`,
 	"http://gocardless.com/b": `<a href="http://gocardless.com/a"></a><img src="picB.png"/><a href="http://gocardless.com/b">link text</a>`,
+}
+
+// Test for dead links
+
+var manyLinksFetcher = FakeFetcher{
+	"http://test.com/a": `<a href="/b"></a> <a href="/c"></a> <a href="/d"></a>`,
+	"http://test.com/b": `<a href="/1b"></a> <a href="/1c"></a> <a href="/1d"></a>`,
+	"http://test.com/c": `<a href="/b"></a> <a href="/c"></a> <a href="/d"></a>`,
+	"http://test.com/d": `<a href="/b"></a> <a href="/c"></a> <a href="/d"></a>`,
 }

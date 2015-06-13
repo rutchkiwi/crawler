@@ -12,13 +12,20 @@ import (
 type queue struct{}
 
 func crawl(seedUrl string, fetcher Fetcher) chan SiteInfo {
-	nonVisited := make(chan string, 100)    // todo should be lower
-	resultsChan := make(chan []string, 100) // todo should be lower
+	nonVisited := make(chan string, 1000000) // todo should be lower
+	resultsChan := make(chan []string)       // todo should be lower
 
-	outputAssets := make(chan SiteInfo, 100) // todo should be lower
+	outputAssets := make(chan SiteInfo) // todo should be lower
 
 	go dispatcher(nonVisited, resultsChan, outputAssets, seedUrl)
+
 	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
+	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
+	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
+	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
+	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
+	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
+
 	return outputAssets
 }
 
@@ -84,7 +91,13 @@ func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- [
 
 		//fmt.Printf("processing url %s \n", url)
 
-		body, _ := fetcher.Fetch(url) //handle error!
+		body, err := fetcher.Fetch(url) //handle error!
+		if err != nil {
+			em := make([]string, 0)
+			// we need to send something so that the dispatcher knows we are done with this job.
+			resultsChan <- em
+			continue
+		}
 
 		assets := findAssets(body)
 		info := SiteInfo{url, assets}
@@ -94,6 +107,8 @@ func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- [
 
 		urls := findUrls(body)
 		resultsChan <- urls
+		//fmt.Printf("done processing url %s \n", url)
+
 	}
 }
 
