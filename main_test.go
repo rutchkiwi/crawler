@@ -89,6 +89,15 @@ func TestError(t *testing.T) {
 	assert.EqualError(t, err, "not found: http://nothingHere.se")
 }
 
+type FakeFetcher map[string]string
+
+func (f FakeFetcher) Fetch(url string) (string, error) {
+	if body, ok := f[url]; ok {
+		return body, nil
+	}
+	return "", fmt.Errorf("not found: %s", url)
+}
+
 var fakeFetcher1 = FakeFetcher{
 	"http://gocardless.com/a":  `<a href="https://gocardless.com/b"><img src="picA.png"/></a>`,
 	"https://gocardless.com/b": `<a href="http://gocardless.com/a"></a><img src="picB.png"/><a href="https://gocardless.com/b">link text</a>`,

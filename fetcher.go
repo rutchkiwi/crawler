@@ -7,18 +7,22 @@ import (
 	"time"
 )
 
+type Fetcher interface {
+	Fetch(url string) (body string, err error)
+}
+
 type WebFetcher struct {
 	client http.Client
 }
 
 func newWebFetcher() WebFetcher {
-	// 2 seconds seems good, could perhaps be optimized.
-	timeout := time.Duration(2 * time.Second)
 	transport := http.Transport{
+		// set up connection pooling
 		MaxIdleConnsPerHost: noHttpWorkers,
 	}
 	client := http.Client{
-		Timeout:   timeout,
+		// 2 seconds arbitrarily chosen
+		Timeout:   time.Duration(2 * time.Second),
 		Transport: &transport,
 	}
 	return WebFetcher{client}

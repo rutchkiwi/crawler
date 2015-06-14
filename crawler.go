@@ -59,8 +59,8 @@ func dispatcher(
 		close(httpErrors)
 	}()
 
-	// Pick up lists of urls from the foundLinksChannel, check if they should be visited, and
-	// if so, puts them on the urlQueue.
+	// Pick up lists of urls from the foundLinksChannel,
+	// check if they should be visited, and if so, puts them on the urlQueue.
 	// This approach allows us to handle the list of visited sites in a single place, and
 	// makes it easier to keep track of when all relevant urls are visited.
 	for res := range foundLinksChannel {
@@ -83,33 +83,26 @@ func dispatcher(
 		}
 		jobsInProgress.Done()
 	}
-
 }
 
 func processUrls(urlQueue <-chan string, fetcher Fetcher, foundLinksChannel chan<- []string, assetsChannel chan<- SiteInfo, errors chan error) {
 	for url := range urlQueue {
-		// todo do assets and url search async ?
 
-		//fmt.Printf("processing url %s \n", url)
-
-		body, err := (fetcher).Fetch(url) //handle error!
+		body, err := (fetcher).Fetch(url)
 		if err != nil {
 			em := make([]string, 0)
 			errors <- err
-			// we need to send something so that the dispatcher knows we are done with this url.
+			// we need to put something on the foundLinksChannel otherwise the dispatcher
+			// will not know that we are done with this url.
 			foundLinksChannel <- em
 			continue
 		}
 
+		// The processing of the html body could be done in a separate goroutine,
+		// but the speed gains would probably be really small.
 		assets := findAssets(body)
-		info := SiteInfo{url, assets}
-
-		assetsChannel <- info
-
-		urls := findUrls(body)
-		foundLinksChannel <- urls
-		//fmt.Printf("done processing url %s \n", url)
-
+		assetsChannel <- SiteInfo{url, assets}
+		foundLinksChannel <- findUrls(body)
 	}
 }
 
