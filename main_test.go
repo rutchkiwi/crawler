@@ -69,15 +69,21 @@ func TestManyLinks(t *testing.T) {
 	// attempt to shake out concurrency issues
 	var results chan SiteInfo
 	results, _ = crawl("http://test.com/a", manyLinksFetcher)
+	urls := make([]string, 4)
+	r := <-results
+	urls = append(urls, r.url)
+	r = <-results
+	urls = append(urls, r.url)
 
-	r1 := <-results
-	assert.Equal(t, "http://test.com/a", r1.url)
-	r2, _ := <-results
-	assert.Equal(t, "http://test.com/b", r2.url)
-	r3, _ := <-results
-	assert.Equal(t, "http://test.com/c", r3.url)
-	r4, _ := <-results
-	assert.Equal(t, "http://test.com/d", r4.url)
+	r = <-results
+	urls = append(urls, r.url)
+	r = <-results
+	urls = append(urls, r.url)
+	fmt.Println(urls)
+	assert.Contains(t, urls, "http://test.com/a")
+	assert.Contains(t, urls, "http://test.com/b")
+	assert.Contains(t, urls, "http://test.com/c")
+	assert.Contains(t, urls, "http://test.com/d")
 	_, more := <-results
 	assert.False(t, more)
 }

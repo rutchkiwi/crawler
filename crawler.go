@@ -97,10 +97,13 @@ func processUrls(urlQueue <-chan string, fetcher Fetcher, foundLinksChannel chan
 			continue
 		}
 
-		// The processing of the html body could be done in a separate goroutine,
-		// but the speed gains would probably be really small.
-		assets := findAssets(body)
-		assetsChannel <- SiteInfo{url, assets}
-		foundLinksChannel <- findUrls(body)
+		// No need to block the http fetching when doing the html parsing.
+		// It's important to pass url and body as parameters, as this ensures they will be
+		// copied by value into the spwned goroutine
+		go func(url string, body string) {
+			assets := findAssets(body)
+			assetsChannel <- SiteInfo{url, assets}
+			foundLinksChannel <- findUrls(body)
+		}(url, body)
 	}
 }
