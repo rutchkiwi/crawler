@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"regexp"
 	"sync"
 )
 
@@ -104,30 +103,4 @@ func processUrls(urlQueue <-chan string, fetcher Fetcher, foundLinksChannel chan
 		assetsChannel <- SiteInfo{url, assets}
 		foundLinksChannel <- findUrls(body)
 	}
-}
-
-//todo DONT PARSE WITH REGEX
-
-func findAssets(html string) []string {
-	r, _ := regexp.Compile(`src="(.*?)"`)
-	matches := r.FindAllStringSubmatch(html, -1)
-
-	res := make([]string, len(matches))
-	for i, match := range matches {
-		res[i] = match[1]
-	}
-
-	return res
-}
-
-func findUrls(html string) []string {
-	r, _ := regexp.Compile(`href="(.*?)"`)
-	matches := r.FindAllStringSubmatch(html, -1)
-
-	res := make([]string, len(matches))
-	for i, match := range matches {
-		res[i] = match[1]
-	}
-
-	return res
 }
