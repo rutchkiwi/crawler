@@ -7,19 +7,28 @@ import (
 	"time"
 )
 
-type WebFetcher struct{}
+type WebFetcher struct {
+	client http.Client
+}
 
-func (f WebFetcher) Fetch(url string) (string, error) {
+func newWebFetcher() WebFetcher {
 	timeout := time.Duration(2 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
+	return WebFetcher{client}
+}
 
+func (f WebFetcher) Fetch(url string) (string, error) {
 	// todo: needs a timeout
-	resp, err := client.Get(url)
+	resp, err := f.client.Get(url)
 	if err != nil { //todo: correct?
-		fmt.Println("REQUEST TIMED OUT")
-		return "", err
+		var err2 error
+		resp, err2 = f.client.Get(url)
+		if err2 != nil { //todo: correct?
+			return "", err2
+		}
+		fmt.Println("RECOVERED!")
 	}
 	defer resp.Body.Close()
 
