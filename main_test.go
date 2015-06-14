@@ -9,7 +9,7 @@ import (
 
 func TestCrawlsRightUrls(t *testing.T) {
 	var results chan SiteInfo
-	results = crawl("http://gocardless.com/a", fakeFetcher1)
+	results, _ = crawl("http://gocardless.com/a", fakeFetcher1)
 
 	r1 := <-results
 	assert.Equal(t, "http://gocardless.com/a", r1.url)
@@ -21,7 +21,7 @@ func TestCrawlsRightUrls(t *testing.T) {
 
 func TestFindImageAssets(t *testing.T) {
 	var results chan SiteInfo
-	results = crawl("http://gocardless.com/a", fakeFetcher1)
+	results, _ = crawl("http://gocardless.com/a", fakeFetcher1)
 
 	r1 := <-results
 	assert.Equal(t, "http://gocardless.com/a", r1.url)
@@ -41,7 +41,7 @@ func TestFindImageAssets(t *testing.T) {
 
 func TestDontGoOutsideOriginalDomain(t *testing.T) {
 	var results chan SiteInfo
-	results = crawl("http://gocardless.com/a", fakeFetcher2)
+	results, _ = crawl("http://gocardless.com/a", fakeFetcher2)
 
 	r1 := <-results
 	assert.Equal(t, "http://gocardless.com/a", r1.url)
@@ -55,7 +55,7 @@ func TestDontGoOutsideOriginalDomain(t *testing.T) {
 
 func TestRelativeUrls(t *testing.T) {
 	var results chan SiteInfo
-	results = crawl("http://gocardless.com/a", fakeFetcherWithRelativeUrl)
+	results, _ = crawl("http://gocardless.com/a", fakeFetcherWithRelativeUrl)
 
 	r1 := <-results
 	assert.Equal(t, "http://gocardless.com/a", r1.url)
@@ -68,7 +68,7 @@ func TestRelativeUrls(t *testing.T) {
 func TestManyLinks(t *testing.T) {
 	// attempt to shake out concurrency issues
 	var results chan SiteInfo
-	results = crawl("http://test.com/a", manyLinksFetcher)
+	results, _ = crawl("http://test.com/a", manyLinksFetcher)
 
 	r1 := <-results
 	assert.Equal(t, "http://test.com/a", r1.url)
@@ -81,6 +81,12 @@ func TestManyLinks(t *testing.T) {
 	r5, more := <-results
 	fmt.Println(r5)
 	assert.False(t, more)
+}
+
+func TestError(t *testing.T) {
+	_, errors := crawl("http://nothingHere.se", fakeFetcher1)
+	err := <-errors
+	assert.EqualError(t, err, "not found: http://nothingHere.se")
 }
 
 var fakeFetcher1 = FakeFetcher{
@@ -97,8 +103,6 @@ var fakeFetcherWithRelativeUrl = FakeFetcher{
 	"http://gocardless.com/a": `<a href="/b"><img src="picA.png"/></a>`,
 	"http://gocardless.com/b": `<a href="http://gocardless.com/a"></a><img src="picB.png"/><a href="http://gocardless.com/b">link text</a>`,
 }
-
-// Test for dead links
 
 var manyLinksFetcher = FakeFetcher{
 	"http://test.com/a": `<a href="/b"></a> <a href="/c"></a> <a href="/d"></a>`,

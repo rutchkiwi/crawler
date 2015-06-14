@@ -11,25 +11,23 @@ import (
 
 type queue struct{}
 
-func crawl(seedUrl string, fetcher Fetcher) chan SiteInfo {
+func crawl(seedUrl string, fetcher Fetcher) (chan SiteInfo, chan error) {
 	nonVisited := make(chan string, 1000000) // todo should be lower
 	resultsChan := make(chan []string)       // todo should be lower
 
-	outputAssets := make(chan SiteInfo) // todo should be lower
+	outputAssets := make(chan SiteInfo)     // todo should be lower
+	httpErrors := make(chan error, 1000000) // todo should be lower
 
-	go dispatcher(nonVisited, resultsChan, outputAssets, seedUrl)
+	go dispatcher(nonVisited, resultsChan, outputAssets, seedUrl, httpErrors)
 
-	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
-	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
-	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
-	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
-	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
-	go processUrls(nonVisited, fetcher, resultsChan, outputAssets)
+	for i := 0; i < 30; i++ {
+		go processUrls(nonVisited, fetcher, resultsChan, outputAssets, httpErrors)
+	}
 
-	return outputAssets
+	return outputAssets, httpErrors
 }
 
-func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets chan<- SiteInfo, seedUrl string) {
+func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets chan<- SiteInfo, seedUrl string, httpErrors chan error) {
 	// because we added a url before
 	seen := make(map[string]bool)
 	var wg sync.WaitGroup
@@ -51,6 +49,7 @@ func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets 
 		close(nonVisited)
 		close(resultsChan)
 		close(outputAssets)
+		close(httpErrors)
 	}()
 
 	for res := range resultsChan {
@@ -85,7 +84,7 @@ func (info SiteInfo) String() string {
 	return fmt.Sprintf("%s has assets: %s", info.url, strings.Join(info.assets, ", "))
 }
 
-func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- []string, outputAssets chan<- SiteInfo) {
+func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- []string, outputAssets chan<- SiteInfo, errors chan error) {
 	for url := range nonVisited {
 		// todo do assets and url search async ?
 
@@ -96,6 +95,8 @@ func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- [
 			em := make([]string, 0)
 			// we need to send something so that the dispatcher knows we are done with this job.
 			resultsChan <- em
+			//fmt.Printf("ERROR for %s %v", url, err)
+			errors <- err
 			continue
 		}
 
