@@ -78,8 +78,7 @@ func TestManyLinks(t *testing.T) {
 	assert.Equal(t, "http://test.com/c", r3.url)
 	r4, _ := <-results
 	assert.Equal(t, "http://test.com/d", r4.url)
-	r5, more := <-results
-	fmt.Println(r5)
+	_, more := <-results
 	assert.False(t, more)
 }
 

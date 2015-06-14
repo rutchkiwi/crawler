@@ -23,8 +23,7 @@ func main() {
 	fmt.Printf("Crawled %d urls, got %d errors in %v\n", noSuccesses, noErrors, timeSpent)
 }
 
-// TODO change to camelcase
-func print_results(results chan SiteInfo, out io.Writer) (noSuccesses int) {
+func printResults(results chan SiteInfo, out io.Writer) (noSuccesses int) {
 	noSuccesses = 0
 	for res := range results {
 		fmt.Fprintln(out, res)

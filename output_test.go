@@ -15,7 +15,7 @@ func TestOutput(t *testing.T) {
 	close(results)
 
 	buf := new(bytes.Buffer)
-	print_results(results, buf)
+	printResults(results, buf)
 	lines := readBufferIntoLines(buf)
 	assert.Equal(t, lines[0], "pageA has assets: asset1, asset2")
 }
