@@ -15,7 +15,6 @@ func newWebFetcher() WebFetcher {
 	// 2 seconds seems good, could perhaps be optimized.
 	timeout := time.Duration(2 * time.Second)
 	transport := http.Transport{
-		//TODO: make constant
 		MaxIdleConnsPerHost: noHttpWorkers,
 	}
 	client := http.Client{
@@ -32,10 +31,10 @@ func (f WebFetcher) Fetch(url string) (string, error) {
 		var err2 error
 		resp, err2 = f.client.Get(url)
 		if err2 != nil {
-			fmt.Println("F")
+			fmt.Print("F")
 			return "", err2
 		}
-		fmt.Println("r")
+		fmt.Print("r")
 	}
 	defer resp.Body.Close()
 
