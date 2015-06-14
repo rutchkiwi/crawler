@@ -12,11 +12,11 @@ type WebFetcher struct {
 }
 
 func newWebFetcher() WebFetcher {
-	// 2 seconds seems like a nice number
+	// 2 seconds seems good, could perhaps be optimized.
 	timeout := time.Duration(2 * time.Second)
 	transport := http.Transport{
-		//TODO make constant
-		MaxIdleConnsPerHost: 30,
+		//TODO: make constant
+		MaxIdleConnsPerHost: noHttpWorkers,
 	}
 	client := http.Client{
 		Timeout:   timeout,
@@ -28,13 +28,14 @@ func newWebFetcher() WebFetcher {
 func (f WebFetcher) Fetch(url string) (string, error) {
 	resp, err := f.client.Get(url)
 	if err != nil {
-		// getto retry logic
+		// ghetto retry logic
 		var err2 error
 		resp, err2 = f.client.Get(url)
 		if err2 != nil {
+			fmt.Println("F")
 			return "", err2
 		}
-		fmt.Println("RECOVERED!")
+		fmt.Println("r")
 	}
 	defer resp.Body.Close()
 

@@ -4,55 +4,59 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
 )
 
-type queue struct{}
+const noHttpWorkers = 30
 
-func crawl(seedUrl string, fetcher Fetcher) (chan SiteInfo, chan error) {
-	nonVisited := make(chan string, 1000000) // todo should be lower
-	resultsChan := make(chan []string)       // todo should be lower
+func crawl(seedUrlString string, fetcher Fetcher) (chan SiteInfo, chan error) {
+	// these do not need to be buffered, but it might help a little bit with performance
+	foundLinksChannel := make(chan []string, 10)
+	assetsChannel := make(chan SiteInfo, 10)
 
-	outputAssets := make(chan SiteInfo)     // todo should be lower
-	httpErrors := make(chan error, 1000000) // todo should be lower
+	// these must have a large enough buffer to contain all seen urls or the program will deadlock
+	urlQueue := make(chan string, 1000000)
+	httpErrors := make(chan error, 1000000)
 
-	go dispatcher(nonVisited, resultsChan, outputAssets, seedUrl, httpErrors)
-
-	for i := 0; i < 30; i++ {
-		go processUrls(nonVisited, fetcher, resultsChan, outputAssets, httpErrors)
+	seedUrl, err := url.Parse(seedUrlString)
+	if err != nil {
+		log.Fatal("Could not parse seed url %s", seedUrlString)
+		os.Exit(1)
 	}
 
-	return outputAssets, httpErrors
+	go dispatcher(urlQueue, foundLinksChannel, assetsChannel, *seedUrl, httpErrors)
+
+	for i := 0; i < noHttpWorkers; i++ {
+		go processUrls(urlQueue, fetcher, foundLinksChannel, assetsChannel, httpErrors)
+	}
+
+	return assetsChannel, httpErrors
 }
 
-func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets chan<- SiteInfo, seedUrl string, httpErrors chan error) {
-	// because we added a url before
-	seen := make(map[string]bool)
-	var wg sync.WaitGroup
+func dispatcher(urlQueue chan string, foundLinksChannel chan []string, assetsChannel chan<- SiteInfo, seedUrl url.URL, httpErrors chan error) {
 
-	wg.Add(1)
+	visitedUrls := make(map[string]bool)
 
-	rootUrl, err := url.Parse(seedUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// we need to keep track of this so we can close channels when there are no more urls to visit
+	var jobsInProgress sync.WaitGroup
 
-	seen[rootUrl.String()] = true
-	nonVisited <- rootUrl.String()
-	//log.Println("Will only allow urls on domain " + allowedDomain)
+	visitedUrls[seedUrl.String()] = true
+	jobsInProgress.Add(1)
+	urlQueue <- seedUrl.String()
 
 	// close channels when job counter reaches zero
 	go func() {
-		wg.Wait()
-		close(nonVisited)
-		close(resultsChan)
-		close(outputAssets)
+		jobsInProgress.Wait()
+		close(urlQueue)
+		close(foundLinksChannel)
+		close(assetsChannel)
 		close(httpErrors)
 	}()
 
-	for res := range resultsChan {
+	for res := range foundLinksChannel {
 		for _, newUrl := range res {
 			parsedUrl, err := url.Parse(newUrl)
 			if err != nil {
@@ -60,17 +64,17 @@ func dispatcher(nonVisited chan string, resultsChan chan []string, outputAssets 
 				continue
 			}
 			if !parsedUrl.IsAbs() {
-				parsedUrl.Host = rootUrl.Host
-				parsedUrl.Scheme = rootUrl.Scheme
+				parsedUrl.Host = seedUrl.Host
+				parsedUrl.Scheme = seedUrl.Scheme
 			}
-			if (!seen[parsedUrl.String()]) && (parsedUrl.Host == rootUrl.Host) {
+			if (!visitedUrls[parsedUrl.String()]) && (parsedUrl.Host == seedUrl.Host) {
 				//fmt.Printf("new url %s found \n", parsedUrl.String())
-				seen[parsedUrl.String()] = true
-				wg.Add(1)
-				nonVisited <- parsedUrl.String()
+				visitedUrls[parsedUrl.String()] = true
+				jobsInProgress.Add(1)
+				urlQueue <- parsedUrl.String()
 			}
 		}
-		wg.Done()
+		jobsInProgress.Done()
 	}
 
 }
@@ -84,8 +88,8 @@ func (info SiteInfo) String() string {
 	return fmt.Sprintf("%s has assets: %s", info.url, strings.Join(info.assets, ", "))
 }
 
-func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- []string, outputAssets chan<- SiteInfo, errors chan error) {
-	for url := range nonVisited {
+func processUrls(urlQueue <-chan string, fetcher Fetcher, foundLinksChannel chan<- []string, assetsChannel chan<- SiteInfo, errors chan error) {
+	for url := range urlQueue {
 		// todo do assets and url search async ?
 
 		//fmt.Printf("processing url %s \n", url)
@@ -95,18 +99,17 @@ func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- [
 			em := make([]string, 0)
 			errors <- err
 			// we need to send something so that the dispatcher knows we are done with this url.
-			resultsChan <- em
+			foundLinksChannel <- em
 			continue
 		}
 
 		assets := findAssets(body)
 		info := SiteInfo{url, assets}
 
-		// bad name outputAssets
-		outputAssets <- info
+		assetsChannel <- info
 
 		urls := findUrls(body)
-		resultsChan <- urls
+		foundLinksChannel <- urls
 		//fmt.Printf("done processing url %s \n", url)
 
 	}
