@@ -20,7 +20,7 @@ func crawl(seedUrl string, fetcher Fetcher) (chan SiteInfo, chan error) {
 
 	go dispatcher(nonVisited, resultsChan, outputAssets, seedUrl, httpErrors)
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		go processUrls(nonVisited, fetcher, resultsChan, outputAssets, httpErrors)
 	}
 
@@ -90,7 +90,7 @@ func processUrls(nonVisited <-chan string, fetcher Fetcher, resultsChan chan<- [
 
 		//fmt.Printf("processing url %s \n", url)
 
-		body, err := fetcher.Fetch(url) //handle error!
+		body, err := (fetcher).Fetch(url) //handle error!
 		if err != nil {
 			em := make([]string, 0)
 			errors <- err

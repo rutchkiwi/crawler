@@ -10,7 +10,8 @@ import (
 func main() {
 	tic := time.Now()
 	var results chan SiteInfo
-	results, errors := crawl("https://gocardless.com/", newWebFetcher())
+	fetcher := newWebFetcher()
+	results, errors := crawl("https://gocardless.com/", &fetcher)
 
 	noSuccesses := printResultsDebug(results, os.Stdout)
 	noErrors := 0
