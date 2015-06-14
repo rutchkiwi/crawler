@@ -1,12 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"regexp"
-	"strings"
 	"sync"
 )
 
@@ -27,7 +25,7 @@ func crawl(seedUrlString string, fetcher Fetcher) (chan SiteInfo, chan error) {
 		os.Exit(1)
 	}
 
-	go dispatcher(urlQueue, foundLinksChannel, assetsChannel, *seedUrl, httpErrors)
+	go dispatcher(*seedUrl, urlQueue, foundLinksChannel, assetsChannel, httpErrors)
 
 	for i := 0; i < noHttpWorkers; i++ {
 		go processUrls(urlQueue, fetcher, foundLinksChannel, assetsChannel, httpErrors)
@@ -36,7 +34,12 @@ func crawl(seedUrlString string, fetcher Fetcher) (chan SiteInfo, chan error) {
 	return assetsChannel, httpErrors
 }
 
-func dispatcher(urlQueue chan string, foundLinksChannel chan []string, assetsChannel chan<- SiteInfo, seedUrl url.URL, httpErrors chan error) {
+func dispatcher(
+	seedUrl url.URL,
+	urlQueue chan string,
+	foundLinksChannel chan []string,
+	assetsChannel chan SiteInfo,
+	httpErrors chan error) {
 
 	visitedUrls := make(map[string]bool)
 
@@ -47,7 +50,7 @@ func dispatcher(urlQueue chan string, foundLinksChannel chan []string, assetsCha
 	jobsInProgress.Add(1)
 	urlQueue <- seedUrl.String()
 
-	// close channels when job counter reaches zero
+	// close channels when there are no more urls to visit
 	go func() {
 		jobsInProgress.Wait()
 		close(urlQueue)
@@ -56,19 +59,23 @@ func dispatcher(urlQueue chan string, foundLinksChannel chan []string, assetsCha
 		close(httpErrors)
 	}()
 
+	// Pick up lists of urls from the foundLinksChannel, check if they should be visited, and
+	// if so, puts them on the urlQueue.
+	// This approach allows us to handle the list of visited sites in a single place, and
+	// makes it easier to keep track of when all relevant urls are visited.
 	for res := range foundLinksChannel {
 		for _, newUrl := range res {
 			parsedUrl, err := url.Parse(newUrl)
 			if err != nil {
-				log.Printf("could not parse url %s", newUrl)
+				// could not parse this url. Ignore it.
 				continue
 			}
 			if !parsedUrl.IsAbs() {
+				// handle relative urls
 				parsedUrl.Host = seedUrl.Host
 				parsedUrl.Scheme = seedUrl.Scheme
 			}
 			if (!visitedUrls[parsedUrl.String()]) && (parsedUrl.Host == seedUrl.Host) {
-				//fmt.Printf("new url %s found \n", parsedUrl.String())
 				visitedUrls[parsedUrl.String()] = true
 				jobsInProgress.Add(1)
 				urlQueue <- parsedUrl.String()
@@ -77,15 +84,6 @@ func dispatcher(urlQueue chan string, foundLinksChannel chan []string, assetsCha
 		jobsInProgress.Done()
 	}
 
-}
-
-type SiteInfo struct {
-	url    string
-	assets []string
-}
-
-func (info SiteInfo) String() string {
-	return fmt.Sprintf("%s has assets: %s", info.url, strings.Join(info.assets, ", "))
 }
 
 func processUrls(urlQueue <-chan string, fetcher Fetcher, foundLinksChannel chan<- []string, assetsChannel chan<- SiteInfo, errors chan error) {
