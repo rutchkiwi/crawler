@@ -7,6 +7,9 @@ import (
 	"sync"
 )
 
+// Experimentally determined to provide a good balance between stability and speed on my home wifi.
+// Varies with you internet connection though, maybe there is a cool way to automatically determine this.
+// (perhaps by dynamically changing the size of the thread pool)
 const noHttpWorkers = 30
 
 func crawl(seedUrlString string, fetcher Fetcher) (chan SiteInfo, chan error) {
