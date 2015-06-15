@@ -8,8 +8,8 @@ import (
 )
 
 var fakeFetcher = FakeFetcher{
-	"http://gocardless.com/a":  `<a href="https://gocardless.com/b"><img src="picA.png"/><img src="picB.png"/></a>`,
-	"https://gocardless.com/b": `<a href="http://gocardless.com/a"></a><img src="picC.png"/><a href="https://gocardless.com/b">link text</a>`,
+	"http://test.com/a":  `<a href="https://test.com/b"><img src="picA.png"/><img src="picB.png"/></a>`,
+	"https://test.com/b": `<a href="http://test.com/a"></a><img src="picC.png"/><a href="https://test.com/b">link text</a>`,
 }
 
 type FakeFetcher map[string]string
@@ -22,15 +22,15 @@ func (f FakeFetcher) Fetch(url string) (string, error) {
 }
 
 func TestCrawlsRightUrls(t *testing.T) {
-	urls := getUrlsFromCrawling(fakeFetcher, "http://gocardless.com/a")
+	urls := getUrlsFromCrawling(fakeFetcher, "http://test.com/a")
 
-	assert.Contains(t, urls, "http://gocardless.com/a")
-	assert.Contains(t, urls, "https://gocardless.com/b")
+	assert.Contains(t, urls, "http://test.com/a")
+	assert.Contains(t, urls, "https://test.com/b")
 	assert.Len(t, urls, 2)
 }
 
 func TestFindImageAssets(t *testing.T) {
-	assets := getAssetsFromCrawling(fakeFetcher, "http://gocardless.com/a")
+	assets := getAssetsFromCrawling(fakeFetcher, "http://test.com/a")
 
 	assert.Len(t, assets, 2)
 	assert.Contains(t, assets, []string{"picA.png", "picB.png"})
@@ -45,25 +45,25 @@ func TestError(t *testing.T) {
 
 func TestDontGoOutsideOriginalDomain(t *testing.T) {
 	var fakeFetcherWithLinkOutsideDomain = FakeFetcher{
-		"http://gocardless.com/a": `<a href="https://google.com"><img src="picA.png"/></a>`,
-		"https://google.com":      `welcome to google <img src="google.png"/>`,
+		"http://test.com/a":  `<a href="https://google.com"><img src="picA.png"/></a>`,
+		"https://google.com": `welcome to google <img src="google.png"/>`,
 	}
-	urls := getUrlsFromCrawling(fakeFetcherWithLinkOutsideDomain, "http://gocardless.com/a")
+	urls := getUrlsFromCrawling(fakeFetcherWithLinkOutsideDomain, "http://test.com/a")
 
 	assert.Len(t, urls, 1)
-	assert.Contains(t, urls, "http://gocardless.com/a")
+	assert.Contains(t, urls, "http://test.com/a")
 }
 
 func TestRelativeUrls(t *testing.T) {
 	var fakeFetcherWithRelativeUrl = FakeFetcher{
-		"http://gocardless.com/a": `<a href="/b"><img src="picA.png"/></a>`,
-		"http://gocardless.com/b": `<a href="http://gocardless.com/a"></a><img src="picB.png"/><a href="http://gocardless.com/b">link text</a>`,
+		"http://test.com/a": `<a href="/b"><img src="picA.png"/></a>`,
+		"http://test.com/b": `<a href="http://test.com/a"></a><img src="picB.png"/><a href="http://test.com/b">link text</a>`,
 	}
-	urls := getUrlsFromCrawling(fakeFetcherWithRelativeUrl, "http://gocardless.com/a")
+	urls := getUrlsFromCrawling(fakeFetcherWithRelativeUrl, "http://test.com/a")
 
 	assert.Len(t, urls, 2)
-	assert.Contains(t, urls, "http://gocardless.com/a")
-	assert.Contains(t, urls, "http://gocardless.com/b")
+	assert.Contains(t, urls, "http://test.com/a")
+	assert.Contains(t, urls, "http://test.com/b")
 }
 
 func TestManyLinks(t *testing.T) {

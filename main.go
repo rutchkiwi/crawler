@@ -11,9 +11,13 @@ func main() {
 	tic := time.Now()
 	var results chan SiteInfo
 	fetcher := newWebFetcher()
-	results, errors := crawl("https://gocardless.com/", &fetcher)
+	if len(os.Args) < 2 {
+		fmt.Println("please provide a seed url as argument.")
+		os.Exit(2)
+	}
+	results, errors := crawl(os.Args[1], &fetcher)
 
-	noSuccesses := printResultsDebug(results, os.Stdout)
+	noSuccesses := printResults(results, os.Stdout)
 	noErrors := 0
 	for range errors {
 		noErrors++

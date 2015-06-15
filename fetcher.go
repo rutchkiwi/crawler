@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -35,10 +34,8 @@ func (f WebFetcher) Fetch(url string) (string, error) {
 		var err2 error
 		resp, err2 = f.client.Get(url)
 		if err2 != nil {
-			fmt.Print("F")
 			return "", err2
 		}
-		fmt.Print("r")
 	}
 	defer resp.Body.Close()
 
